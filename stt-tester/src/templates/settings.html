@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input[type="text"] { width: 100%; max-width: 400px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .checkbox-group { margin-left: 20px; }
+        .checkbox-group label { font-weight: normal; display: flex; align-items: center; }
+        .checkbox-group input { margin-right: 10px; }
+        .save-btn { background: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .save-btn:hover { background: #1565c0; }
+        .save-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .message { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+        .message.success { background: #d4edda; color: #155724; display: block; }
+        .message.error { background: #f8d7da; color: #721c24; display: block; }
+        .loading { color: #666; font-style: italic; }
+        a { color: #1976d2; }
+    </style>
+</head>
+<body>
+    <h1>STT Settings</h1>
+    <p><a href="{{ url_for('list_sessions') }}">← Back to Sessions</a></p>
+    
+    <div class="form-group">
+        <label for="primary-entity-id">Primary Entity ID (transcript returned):</label>
+        <select id="primary-entity-id" name="primary_entity_id">
+            <option value="">Select an entity...</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>Additional STT Entities:</label>
+        <div id="additional-entities" class="checkbox-group">
+            <p class="loading">Loading entities...</p>
+        </div>
+    </div>
+    
+    <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+    
+    <div id="message" class="message"></div>
+    
+    <script>
+        let availableEntities = [];
+        const primaryEntityId = {{ primary_entity_id|tojson }};
+        const additionalEntitiesSet = new Set({{ additional_entities|tojson }});
+        const entitiesUrl = '{{ url_for("list_available_entities") }}';
+        const saveSettingsUrl = '{{ url_for("save_settings_route") }}';
+        
+        function loadEntities() {
+            fetch(entitiesUrl)
+                .then(response => response.json())
+                .then(data => {
+                    availableEntities = data.entities || [];
+                    renderEntities();
+                })
+                .catch(error => {
+                    document.getElementById('additional-entities').innerHTML = 
+                        '<p style="color: red;">Error loading entities</p>';
+                });
+        }
+        
+        function renderEntities() {
+            const primaryEntitySelect = document.getElementById('primary-entity-id');
+            const container = document.getElementById('additional-entities');
+            
+            primaryEntitySelect.innerHTML = '<option value="">Select an entity...</option>';
+            container.innerHTML = '';
+            
+            availableEntities.forEach(entityId => {
+                const primaryOption = document.createElement('option');
+                primaryOption.value = entityId;
+                primaryOption.textContent = entityId;
+                if (entityId === primaryEntityId) {
+                    primaryOption.selected = true;
+                }
+                primaryEntitySelect.appendChild(primaryOption);
+                
+                // Additional entities
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = entityId;
+                checkbox.id = 'entity-' + entityId.replace(/\./g, '-');
+                checkbox.checked = additionalEntitiesSet.has(entityId);
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(entityId));
+                container.appendChild(label);
+                container.appendChild(document.createElement('br'));
+            });
+            
+            if (container.innerHTML.trim() === '') {
+                container.innerHTML = '<p style="color: #666; font-style: italic;">No additional entities available</p>';
+            }
+        }
+        
+        function saveSettings() {
+            const primaryEntity = document.getElementById('primary-entity-id').value;
+            
+            const checkboxes = document.querySelectorAll('#additional-entities input[type="checkbox"]');
+            additionalEntities = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+            
+            if (!primaryEntity) {
+                showMessage('Please select Primary Entity ID', 'error');
+                return;
+            }
+            
+            fetch(saveSettingsUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    primary_entity_id: primaryEntity,
+                    additional_entities: additionalEntities
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Settings saved!', 'success');
+                } else {
+                    showMessage('Failed to save settings', 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Failed to save settings', 'error');
+            });
+        }
+        
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = 'message ' + type;
+            setTimeout(() => {
+                messageDiv.className = 'message';
+            }, 5000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadEntities);
+    </script>
+</body>
+</html>

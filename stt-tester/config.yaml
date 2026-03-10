@@ -1,0 +1,22 @@
+---
+version: 0.0.1
+slug: stt-tester
+name: stt-tester
+description: Speech-to-text tester
+url: https://github.com/OHF-Voice/apps-testing/tree/master/stt-tester
+arch:
+  - amd64
+  - aarch64
+init: false
+discovery:
+  - wyoming
+homeassistant_api: true
+options:
+  debug_logging: false
+schema:
+  debug_logging: bool
+ports:
+  "10300/tcp": null
+homeassistant: 2023.11.0
+ingress: true
+ingress_port: 5000

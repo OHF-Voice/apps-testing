@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sessions</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { margin-bottom: 20px; }
+        .session { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        .session h2 { margin-top: 0; }
+        .transcript { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .transcript strong { display: block; margin-bottom: 5px; }
+        audio { width: 100%; max-width: 600px; }
+    .delete-btn { background: #d32f2f; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+    .delete-btn:hover { background: #b71c1c; }
+    .save-notes-btn { background: #1976d2; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 0 5px; }
+    .save-notes-btn:hover { background: #1565c0; }
+    .notes { margin-top: 10px; }
+    .notes-buttons { margin-top: 8px; }
+    .notes-buttons form { display: inline-block; margin-right: 10px; }
+    .notes textarea { width: 100%; max-width: 600px; min-height: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+    .no-sessions { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Sessions</h1>
+    <p><a href="{{ url_for('settings_page') }}">STT Settings</a></p>
+    {% if sessions is none or sessions|length == 0 %}
+        <p class="no-sessions">No sessions found.</p>
+    {% else %}
+        {% for session in sessions %}
+        <div class="session">
+            <h2>Session: {{ session.id }}</h2>
+            {% if session.audio_exists %}
+            <audio controls>
+                <source src="{{ url_for('play_audio', session_id=session.id) }}" type="audio/wav">
+                Your browser does not support the audio element.
+            </audio>
+            {% endif %}
+            {% if session.transcripts %}
+            <div>
+                {% for entity_id, data in session.transcripts.items() %}
+                <div class="transcript">
+                    <strong>{{ entity_id }} ({{ data.target_language }}):</strong>
+                    <p>{{ data.text }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="notes">
+                <textarea placeholder="Add notes for this session..." id="notes-textarea-{{ session.id }}">{{ session.notes }}</textarea>
+            </div>
+            <div class="notes-buttons">
+                <form method="POST" action="{{ url_for('save_notes', session_id=session.id) }}" style="display: inline;" onsubmit="saveNotes(event, this, '{{ session.id }}'); return false;">
+                    <button type="submit" class="save-notes-btn">Save Notes</button>
+                </form>
+                <form method="POST" action="{{ url_for('delete_session', session_id=session.id) }}" onsubmit="deleteSession(event, this); return false;">
+                    <button type="submit" class="delete-btn">Delete Session</button>
+                </form>
+            </div>
+            <script>
+                function deleteSession(event, form) {
+                    event.preventDefault();
+                    if (!confirm('Delete this session?')) return;
+                    fetch(form.action, { method: 'POST' })
+                        .then(response => {
+                            if (response.ok) {
+                                window.location.href = '{{ url_for("list_sessions") }}';
+                            } else {
+                                alert('Failed to delete session');
+                            }
+                        })
+                        .catch(() => alert('Failed to delete session'));
+                }
+                
+                function saveNotes(event, form, sessionId) {
+                    event.preventDefault();
+                    const textarea = document.getElementById('notes-textarea-' + sessionId);
+                    const notes = textarea.value;
+                    
+                    fetch(form.action, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ notes: notes })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            form.querySelector('button').textContent = 'Saved!';
+                            setTimeout(() => {
+                                form.querySelector('button').textContent = 'Save Notes';
+                            }, 2000);
+                        } else {
+                            alert('Failed to save notes');
+                        }
+                    })
+                    .catch(() => alert('Failed to save notes'));
+                }
+            </script>
+        </div>
+        {% endfor %}
+    {% endif %}
+</body>
+</html>
